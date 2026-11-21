@@ -1,0 +1,72 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    max-http-form-post-size: 2MB
+
+spring:
+  # 默认激活本地 profile：加载 application-local.yml 覆盖敏感字段（如 datasource.password）。
+  # 生产部署时通过 SPRING_PROFILES_ACTIVE=prod 环境变量覆盖为 prod。
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/auth_system?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:change-me-in-production}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+  jwt:
+    # 开发环境默认值：合法的 Base64 字符串，解码后为 48 字节（>= HS256 要求的 32 字节）。
+    # 生产环境务必通过 JWT_SECRET 环境变量覆盖为随机生成的强密钥：
+    #   openssl rand -base64 48
+    secret: ${JWT_SECRET:ZGV2c2VjcmV0a2V5ZGV2c2VjcmV0a2V5ZGV2c2VjcmV0a2V5ZGV2c2VjcmV0a2V5}
+    expiration: ${JWT_EXPIRATION:86400000}
+  rsa:
+    keystore: classpath:auth.p12
+    keystore-password: ${RSA_KEYSTORE_PASSWORD:change-me-in-production}
+    alias: auth
+    key-password: ${RSA_KEY_PASSWORD:change-me-in-production}
+  ai:
+    # 硅基流动 API（免费 2000 万 tokens，速度快，国内稳定）
+    api-url: ${AI_API_URL:https://api.siliconflow.cn/v1/chat/completions}
+    api-key: ${AI_API_KEY:your-siliconflow-api-key-here}
+    # 文本模型：Qwen2.5-7B（速度快、效果好）
+    model: ${AI_MODEL:Qwen/Qwen2.5-7B-Instruct}
+    # 图片识别模型：使用 Qwen3-VL（SiliconFlow 支持的视觉模型）
+    image-model: ${AI_IMAGE_MODEL:Qwen/Qwen3-VL-8B-Instruct}
+    # 文生图模型：Qwen-Image（图片生成工具使用）
+    text-to-image-model: ${AI_TEXT_TO_IMAGE_MODEL:Qwen/Qwen-Image}
+
+  # Replicate API（视频生成 - 主方案）
+  replicate:
+    api-key: ${REPLICATE_API_KEY:your-replicate-api-key-here}
+
+  # Hugging Face API（视频生成 - 备用降级方案，可选）
+  huggingface:
+    api-key: ${HUGGINGFACE_API_KEY:}

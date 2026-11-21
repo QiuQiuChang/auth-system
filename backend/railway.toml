@@ -1,0 +1,12 @@
+# Railway 部署配置
+# 在 Railway 项目中将 Root Directory 设为 backend，Railway 会读取此文件。
+
+[build]
+# 使用同目录下的 Dockerfile 构建镜像
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# 应用崩溃时自动重启，最多重试 10 次
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

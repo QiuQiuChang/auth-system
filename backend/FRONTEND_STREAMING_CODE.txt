@@ -1,0 +1,238 @@
+# 前端流式优化 - 完整代码
+
+## 1. 修改 ChatPageMultimodal.jsx
+
+在文件开头添加导入：
+```javascript
+import { Drawer, Slider, Switch, Space, Typography } from 'antd'
+import { SettingOutlined } from '@ant-design/icons'
+```
+
+在组件内添加状态：
+```javascript
+const [chatOptions, setChatOptions] = useState({
+  temperature: 0.7,
+  topP: 0.9,
+  maxTokens: 2048,
+  stream: true,
+  enableThinking: false,
+  thinkingBudget: 2048
+})
+const [showSettings, setShowSettings] = useState(false)
+const [streaming, setStreaming] = useState(false)
+```
+
+添加流式发送方法（替换原handleSend）：
+```javascript
+const handleSendStream = async () => {
+  if (!input.trim() && uploadedImages.length === 0) return
+
+  const userMessage = {
+    role: 'user',
+    content: []
+  }
+
+  if (input.trim()) {
+    userMessage.content.push({ type: 'text', text: input.trim() })
+  }
+
+  uploadedImages.forEach(img => {
+    userMessage.content.push({
+      type: 'image_url',
+      image_url: { url: img.url }
+    })
+  })
+
+  setMessages(prev => [...prev, userMessage])
+  setInput('')
+  setUploadedImages([])
+  setStreaming(true)
+
+  try {
+    const response = await fetch('http://localhost:8080/api/chat/vision/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        messages: [...messages, userMessage],
+        options: chatOptions
+      })
+    })
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    
+    let assistantMessage = { role: 'assistant', content: '' }
+    setMessages(prev => [...prev, assistantMessage])
+    
+    let buffer = ''
+    
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.substring(6)
+          if (data === '[DONE]') continue
+          
+          try {
+            const chunk = JSON.parse(data)
+            const delta = chunk.choices?.[0]?.delta?.content || ''
+            
+            if (delta) {
+              setMessages(prev => {
+                const newMessages = [...prev]
+                const lastMsg = newMessages[newMessages.length - 1]
+                lastMsg.content += delta
+                return newMessages
+              })
+            }
+          } catch (e) {
+            console.error('解析失败:', e)
+          }
+        } else if (line.startsWith('event: done')) {
+          refreshUser()
+        }
+      }
+    }
+    
+  } catch (error) {
+    antMessage.error('发送失败: ' + error.message)
+  } finally {
+    setStreaming(false)
+  }
+}
+```
+
+修改header部分：
+```javascript
+<div className="chat-header">
+  <h2>AI 助手（多模态）</h2>
+  <Space>
+    <Button 
+      icon={<SettingOutlined />} 
+      onClick={() => setShowSettings(true)}
+    >
+      设置
+    </Button>
+    <Button 
+      icon={<DeleteOutlined />} 
+      onClick={() => { setMessages([]); setUploadedImages([]) }}
+    >
+      清空
+    </Button>
+  </Space>
+</div>
+```
+
+在return的末尾（</div>之前）添加设置抽屉：
+```javascript
+<Drawer 
+  title="聊天设置" 
+  placement="right"
+  open={showSettings} 
+  onClose={() => setShowSettings(false)}
+  width={360}
+>
+  <Space direction="vertical" style={{ width: '100%' }} size="large">
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text>Temperature: {chatOptions.temperature}</Text>
+        <Slider 
+          min={0} 
+          max={2} 
+          step={0.1} 
+          value={chatOptions.temperature}
+          onChange={(v) => setChatOptions({...chatOptions, temperature: v})}
+        />
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          控制输出随机性，值越低结果越确定
+        </Text>
+      </Space>
+    </div>
+    
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text>Top P: {chatOptions.topP}</Text>
+        <Slider 
+          min={0} 
+          max={1} 
+          step={0.05} 
+          value={chatOptions.topP}
+          onChange={(v) => setChatOptions({...chatOptions, topP: v})}
+        />
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          控制核采样，值越低输出越聚焦
+        </Text>
+      </Space>
+    </div>
+    
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Space>
+          <Switch 
+            checked={chatOptions.stream}
+            onChange={(checked) => setChatOptions({...chatOptions, stream: checked})}
+          />
+          <Text>启用流式输出</Text>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          实时显示AI回复，提升响应体验
+        </Text>
+      </Space>
+    </div>
+    
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Space>
+          <Switch 
+            checked={chatOptions.enableThinking}
+            onChange={(checked) => setChatOptions({...chatOptions, enableThinking: checked})}
+          />
+          <Text>启用思维链模式</Text>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          展示AI推理过程，适合复杂任务
+        </Text>
+      </Space>
+    </div>
+    
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Text>最大Token数: {chatOptions.maxTokens}</Text>
+        <Slider 
+          min={512} 
+          max={4096} 
+          step={256} 
+          value={chatOptions.maxTokens}
+          onChange={(v) => setChatOptions({...chatOptions, maxTokens: v})}
+        />
+      </Space>
+    </div>
+  </Space>
+</Drawer>
+```
+
+修改发送按钮：
+```javascript
+<Button
+  type="primary"
+  icon={<SendOutlined />}
+  onClick={chatOptions.stream ? handleSendStream : handleSend}
+  loading={streaming}
+  disabled={!input.trim() && uploadedImages.length === 0}
+>
+  {streaming ? '生成中...' : '发送'}
+</Button>
+```
+
+## 完成！
+
+保存文件后，前端会自动热重载。测试流式输出功能。

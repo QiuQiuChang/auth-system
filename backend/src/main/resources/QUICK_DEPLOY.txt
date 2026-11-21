@@ -1,0 +1,62 @@
+# AI工具箱增强 - 快速部署指南
+
+## 已完成的工作
+
+1. ✅ 创建SQL脚本：backend/src/main/resources/seed-enhanced-tools.sql
+   - 新增12个工具（视频创作2个、开发工具3个、办公效率3个、内容创作2个、创意设计2个）
+
+2. ✅ 更新前端配置：frontend/src/pages/ToolsPage.jsx
+   - 新增11个图标映射
+   - 新增3个分类颜色（创意设计、视频创作、开发工具）
+
+3. ✅ 创建详细文档：docs/AI_TOOLS_ENHANCEMENT.md
+
+## 立即执行（3步）
+
+### 步骤1：导入数据库
+```
+mysql -u root -p auth_system < backend/src/main/resources/seed-enhanced-tools.sql
+```
+
+### 步骤2：重启后端
+```
+cd backend
+mvn spring-boot:run
+```
+
+### 步骤3：验证功能
+访问 http://localhost:3000/tools
+应该看到18个工具（原6个 + 新12个），分为6个分类
+
+## 新增工具速查
+
+【视频创作】
+- 产品宣传视频 (product-video)
+- 短视频脚本生成 (video-script)
+
+【开发工具】
+- 代码注释生成 (code-comment)
+- Bug分析助手 (bug-analyzer)
+- 单元测试生成 (unit-test)
+
+【办公效率】
+- 会议纪要生成 (meeting-minutes)
+- 商务邮件撰写 (business-email)
+- PPT大纲生成 (ppt-outline)
+
+【内容创作】
+- AI文章续写 (article-continue)
+- 内容摘要提取 (content-summary)
+
+【创意设计】
+- Logo设计生成 (logo-design)
+- 社交媒体配图 (social-media-image)
+
+## 验证SQL
+```
+mysql -u root -p -e "USE auth_system; SELECT category, COUNT(*) as count FROM tool_config WHERE status=1 GROUP BY category;"
+```
+
+预期输出6个分类，总计18个工具
+
+详细文档：docs/AI_TOOLS_ENHANCEMENT.md

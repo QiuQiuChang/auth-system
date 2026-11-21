@@ -1,0 +1,124 @@
+package com.auth.service;
+
+import com.auth.dto.AuthResponse;
+import com.auth.dto.LoginRequest;
+import com.auth.dto.RegisterRequest;
+import com.auth.dto.UserResponse;
+import com.auth.entity.User;
+import com.auth.exception.DuplicateResourceException;
+import com.auth.repository.UserRepository;
+import com.auth.util.JwtUtil;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.crypto.Cipher;
+import java.nio.charset.StandardCharsets;
+import java.security.PublicKey;
+import java.util.Base64;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class AuthServiceTest {
+
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private PublicKey rsaPublicKey;
+
+    private String testUsername;
+    private String testEmail;
+    private String testPassword;
+
+    @BeforeEach
+    void setUp() {
+        userRepository.deleteAll();
+        testUsername = "testuser";
+        testEmail = "test@example.com";
+        testPassword = "TestPass123!";
+    }
+
+    private String encryptPassword(String plainPassword) throws Exception {
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, rsaPublicKey);
+        byte[] encrypted = cipher.doFinal(plainPassword.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    @Test
+    @DisplayName("注册 - RSA加密密码成功")
+    void testRegisterWithRsaEncryption() throws Exception {
+        String encryptedPassword = encryptPassword(testPassword);
+        RegisterRequest request = RegisterRequest.builder()
+                .username(testUsername)
+                .email(testEmail)
+                .password(encryptedPassword)
+                .build();
+
+        UserResponse response = authService.register(request);
+
+        assertNotNull(response);
+        assertEquals(testUsername, response.getUsername());
+        assertEquals(300, response.getPoints());
+
+        User savedUser = userRepository.findByUsername(testUsername).orElseThrow();
+        assertTrue(savedUser.getPassword().startsWith("$2a$"));
+    }
+
+    @Test
+    @DisplayName("登录 - RSA加密验证成功")
+    void testLoginSuccess() throws Exception {
+        String encryptedPassword = encryptPassword(testPassword);
+        authService.register(RegisterRequest.builder()
+                .username(testUsername).email(testEmail).password(encryptedPassword).build());
+
+        AuthResponse response = authService.login(LoginRequest.builder()
+                .username(testUsername).password(encryptedPassword).build());
+
+        assertNotNull(response.getToken());
+        assertEquals(testUsername, jwtUtil.extractUsername(response.getToken()));
+    }
+
+    @Test
+    @DisplayName("登录 - 密码错误")
+    void testLoginWrongPassword() throws Exception {
+        authService.register(RegisterRequest.builder()
+                .username(testUsername).email(testEmail).password(encryptPassword(testPassword)).build());
+
+        assertThrows(BadCredentialsException.class, () ->
+                authService.login(LoginRequest.builder()
+                        .username(testUsername).password(encryptPassword("WrongPass")).build()));
+    }
+
+    @Test
+    @DisplayName("账户锁定 - 5次失败")
+    void testAccountLock() throws Exception {
+        String encryptedPassword = encryptPassword(testPassword);
+        authService.register(RegisterRequest.builder()
+                .username(testUsername).email(testEmail).password(encryptedPassword).build());
+
+        for (int i = 0; i < 5; i++) {
+            assertThrows(BadCredentialsException.class, () ->
+                    authService.login(LoginRequest.builder()
+                            .username(testUsername).password(encryptPassword("Wrong")).build()));
+        }
+
+        User user = userRepository.findByUsername(testUsername).orElseThrow();
+        assertNotNull(user.getLockUntil());
+    }
+}

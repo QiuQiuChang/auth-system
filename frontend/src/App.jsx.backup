@@ -1,0 +1,82 @@
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { App as AntApp, ConfigProvider, Spin } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { RechargeProvider } from './contexts/RechargeContext';
+import { setMessageApi } from './utils/messageHolder';
+import AppLayout from './components/AppLayout';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import HomePage from './pages/HomePage';
+import ToolsPage from './pages/ToolsPage';
+import ToolExecutePage from './pages/ToolExecutePage';
+import ProtectedRoute from './routes/ProtectedRoute';
+import GuestRoute from './routes/GuestRoute';
+import LoadingOverlay from './components/LoadingOverlay';
+
+const AppContent = () => {
+  const { message } = AntApp.useApp();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    setMessageApi(message);
+  }, [message]);
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  return (
+    <LoadingOverlay>
+      <Routes>
+        {/* 无需布局的页面 */}
+        <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+        <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+
+        {/* 侧边栏布局内的页面 */}
+        <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+          <Route path="/home" element={<ChatPage />} />
+          <Route path="/tools" element={<ToolsPage />} />
+          <Route path="/tools/:slug" element={<ToolExecutePage />} />
+        </Route>
+
+        {/* 重定向 */}
+        <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+        <Route path="/" element={<Navigate to={isAuthenticated ? '/home' : '/login'} replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? '/home' : '/login'} replace />} />
+      </Routes>
+    </LoadingOverlay>
+  );
+};
+
+const App = () => {
+  return (
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        token: {
+          colorPrimary: '#2563eb',
+          borderRadius: 8,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif",
+        },
+      }}
+    >
+      <AntApp>
+        <AuthProvider>
+          <RechargeProvider>
+            <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <AppContent />
+            </Router>
+          </RechargeProvider>
+        </AuthProvider>
+      </AntApp>
+    </ConfigProvider>
+  );
+};
+
+export default App;

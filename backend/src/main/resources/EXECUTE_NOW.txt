@@ -1,0 +1,61 @@
+========================================
+立即执行 - 数据库导入指南
+========================================
+
+## 当前位置
+D:\WorkSpaceCode\test\backend\src\main\resources
+
+## 文件确认
+✅ seed-enhanced-tools.sql (13个INSERT语句, 525行)
+
+## 立即执行（Windows）
+
+### 方法1：直接导入（推荐）
+```cmd
+mysql -u root -p auth_system < seed-enhanced-tools.sql
+```
+输入密码后自动导入
+
+### 方法2：交互式导入
+```cmd
+mysql -u root -p
+```
+然后执行：
+```sql
+USE auth_system;
+SOURCE seed-enhanced-tools.sql;
+```
+
+## 验证导入
+
+```cmd
+mysql -u root -p -e "USE auth_system; SELECT category, COUNT(*) as count FROM tool_config WHERE status=1 GROUP BY category;"
+```
+
+## 预期结果
+
+应该看到7个分类，共19个工具：
+- 内容创作: 3
+- 创意设计: 5  
+- 办公效率: 4
+- 开发工具: 3
+- 智能分析: 1 (新增)
+- 法律服务: 1
+- 视频创作: 2
+
+## 如果导入成功
+
+1. 返回项目根目录: cd D:\WorkSpaceCode\test
+2. 重启后端: cd backend && mvn spring-boot:run
+3. 访问测试: http://localhost:3000/tools
+
+## 文件清单
+
+✅ SQL脚本: backend/src/main/resources/seed-enhanced-tools.sql
+✅ 前端配置: frontend/src/pages/ToolsPage.jsx (已更新)
+✅ 详细文档: docs/AI_TOOLS_ENHANCEMENT.md
+✅ 执行总结: FINAL_SUMMARY.txt
+
+========================================
+就绪状态：可立即导入
+========================================
